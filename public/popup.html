@@ -7,17 +7,34 @@
   </head>
   <body>
     <div class="app">
-      <p class="counter-label">Counter</p>
-      <div id="counter" class="counter"></div>
-      <div class="button-container">
-        <button id="decrementBtn" class="button">-</button>
-        <button id="incrementBtn" class="button">+</button>
-      </div>
+      <p class="title">How to use the extractor</p>
+      <p class="subtitle">
+        Once you open the html table format of your timetable press the button
+        bellow. Clicking the button should start the download of the calendar in
+        your browser.
+      </p>
 
       <hr class="divider" />
 
-      <p class="title">Chrome Extension is Ready!</p>
-      <p class="subtitle">Start by updating <code>popup.html</code></p>
+      <div class="form-input">
+        <label class="switch">
+          <input type="checkbox" id="enable-types"/>
+          <span class="slider round"></span>
+        </label>
+
+        <label>Enable downloading individual calendars for each different type of
+        events</label>
+        
+        <input type="number" class="input-number" id="first-week" min="1" max="52" step="1"/>
+        <label>First week of the semester in the year</label>
+
+        <input type="number" class="input-number" id="current-year" min="2023" max="9999" step="1"/>
+        <label>The year the semester is starting in</label>
+      </div>
+
+      <hr class="divider"/>
+      <button id="extractBtn" class="button">Extract to iCal!</button>
+      <p class="error" id="error"></p>
     </div>
 
     <script src="popup.js"></script>

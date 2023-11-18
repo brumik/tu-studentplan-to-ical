@@ -1,112 +1,96 @@
 'use strict';
 
 import './popup.css';
+import * as ics from 'ics';
 
-(function () {
-  // We will make use of Storage API to get and store `count` value
-  // More information on Storage API can we found at
-  // https://developer.chrome.com/extensions/storage
+function onLoad () {
+  function getInitialValues() {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length < 1) return;
 
-  // To get storage access, we have to mention it in `permissions` property of manifest.json file
-  // More information on Permissions can we found at
-  // https://developer.chrome.com/extensions/declare_permissions
-  const counterStorage = {
-    get: (cb) => {
-      chrome.storage.sync.get(['count'], (result) => {
-        cb(result.count);
-      });
-    },
-    set: (value, cb) => {
-      chrome.storage.sync.set(
+      const tab = tabs[0];
+
+      chrome.tabs.sendMessage(
+        tab.id,
         {
-          count: value,
+          type: 'GET_DATA',
         },
-        () => {
-          cb();
+        (payload) => {
+          if (!payload) {
+            document.getElementById('error').innerText = 'The page is not a timetable. (If it is try to reload or contact the developer)';
+            document.getElementById('extractBtn').disabled = true;
+            return;
+          }
+
+          const { week, year } = payload;
+          document.getElementById('first-week').value = week;
+          document.getElementById('current-year').value = year;
+          document.getElementById('error').innerText = '';
         }
       );
-    },
-  };
-
-  function setupCounter(initialValue = 0) {
-    document.getElementById('counter').innerHTML = initialValue;
-
-    document.getElementById('incrementBtn').addEventListener('click', () => {
-      updateCounter({
-        type: 'INCREMENT',
-      });
     });
+  };  
 
-    document.getElementById('decrementBtn').addEventListener('click', () => {
-      updateCounter({
-        type: 'DECREMENT',
-      });
-    });
-  }
+  function runExtract() {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
 
-  function updateCounter({ type }) {
-    counterStorage.get((count) => {
-      let newCount;
+      chrome.tabs.sendMessage(
+        tab.id,
+        {
+          type: 'EXTRACT',
+          payload: {
+            first_week: +document.getElementById("first-week").value,
+            current_year: +document.getElementById("current-year").value,
+          }
+        },
+        ({ events, eventTypes, error}) => {
+          if (error && error.length > 0) {
+            document.getElementById('error').innerText = error;
+          }
 
-      if (type === 'INCREMENT') {
-        newCount = count + 1;
-      } else if (type === 'DECREMENT') {
-        newCount = count - 1;
-      } else {
-        newCount = count;
-      }
-
-      counterStorage.set(newCount, () => {
-        document.getElementById('counter').innerHTML = newCount;
-
-        // Communicate with content script of
-        // active tab by sending a message
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          const tab = tabs[0];
-
-          chrome.tabs.sendMessage(
-            tab.id,
-            {
-              type: 'COUNT',
-              payload: {
-                count: newCount,
-              },
-            },
-            (response) => {
-              console.log('Current count value passed to contentScript file');
-            }
-          );
-        });
-      });
+          ics.createEvents(events, (error, value) => {
+            if (error) console.log('error', error);
+            else chrome.downloads.download({ 
+              filename: 'events/all-events.ics',
+              url: "data:text/calendar," + value,
+            }); 
+          });
+          if (document.getElementById("enable-types").checked && eventTypes.length > 1) {
+            eventTypes.forEach(type => {
+              ics.createEvents(events.filter(item => item.title.startsWith(`[${type}] `)), (error, value) => {
+                if (error) console.log('errcor', error);
+                else chrome.downloads.download({ 
+                  filename: `events/${type}-events.ics`,
+                  url: "data:text/calendar," + value,
+                }); 
+              });
+            });
+          }
+        }
+      );
     });
   }
 
-  function restoreCounter() {
-    // Restore count value
-    counterStorage.get((count) => {
-      if (typeof count === 'undefined') {
-        // Set counter value as 0
-        counterStorage.set(0, () => {
-          setupCounter(0);
-        });
-      } else {
-        setupCounter(count);
-      }
-    });
-  }
+  // Call this every time the popup is opened.
+  getInitialValues();
+  document.getElementById('extractBtn').addEventListener('click', () => {
+    runExtract();
+  });
+  document.addEventListener('DOMContentLoaded', setup);
 
-  document.addEventListener('DOMContentLoaded', restoreCounter);
+  // // Communicate with background file by sending a message
+  // chrome.runtime.sendMessage(
+  //   {
+  //     type: 'GREETINGS',
+  //     payload: {
+  //       message: 'Hello, my name is Pop. I am from Popup.',
+  //     },
+  //   },
+  //   (response) => {
+  //     console.log(response.message);
+  //   }
+  // );
+};
 
-  // Communicate with background file by sending a message
-  chrome.runtime.sendMessage(
-    {
-      type: 'GREETINGS',
-      payload: {
-        message: 'Hello, my name is Pop. I am from Popup.',
-      },
-    },
-    (response) => {
-      console.log(response.message);
-    }
-  );
-})();
+window.onload = onLoad;
