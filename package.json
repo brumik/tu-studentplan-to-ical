@@ -1,6 +1,6 @@
 {
   "name": "tu-studentplan",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "My Chrome Extension",
   "private": true,
   "scripts": {
